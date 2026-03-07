@@ -143,14 +143,9 @@ func handleLaunch(profile string, args []string) {
 	// Handle worktree creation
 	var worktreePath, worktreeRepoRoot string
 	if wtBranch != "" {
-		if !git.IsGitRepo(path) {
-			out.Error(fmt.Sprintf("%s is not a git repository", path), ErrCodeInvalidOperation)
-			os.Exit(1)
-		}
-
-		repoRoot, err := git.GetWorktreeBaseRoot(path)
+		backend, err := git.NewGitBackend(path)
 		if err != nil {
-			out.Error(fmt.Sprintf("failed to get repo root: %v", err), ErrCodeInvalidOperation)
+			out.Error(fmt.Sprintf("failed to initialize git: %v", err), ErrCodeInvalidOperation)
 			os.Exit(1)
 		}
 
@@ -159,8 +154,7 @@ func handleLaunch(profile string, args []string) {
 			os.Exit(1)
 		}
 
-		branchExists := git.BranchExists(repoRoot, wtBranch)
-		if createNewBranch && branchExists {
+		if createNewBranch && backend.BranchExists(wtBranch) {
 			out.Error(fmt.Sprintf("branch '%s' already exists (remove -b flag to use existing branch)", wtBranch), ErrCodeInvalidOperation)
 			os.Exit(1)
 		}
@@ -174,13 +168,13 @@ func handleLaunch(profile string, args []string) {
 		worktreePath = git.WorktreePath(git.WorktreePathOptions{
 			Branch:    wtBranch,
 			Location:  location,
-			RepoDir:   repoRoot,
+			RepoDir:   backend.RepoDir(),
 			SessionID: git.GeneratePathID(),
 			Template:  wtSettings.Template(),
 		})
 
 		// Check for an existing worktree for this branch before creating a new one
-		if existingPath, err := git.GetWorktreeForBranch(repoRoot, wtBranch); err == nil && existingPath != "" {
+		if existingPath, err := backend.GetWorktreeForBranch(wtBranch); err == nil && existingPath != "" {
 			fmt.Fprintf(os.Stderr, "Reusing existing worktree at %s for branch %s\n", existingPath, wtBranch)
 			worktreePath = existingPath
 		} else {
@@ -194,13 +188,13 @@ func handleLaunch(profile string, args []string) {
 				os.Exit(1)
 			}
 
-			if err := git.CreateWorktree(repoRoot, worktreePath, wtBranch); err != nil {
+			if err := backend.CreateWorktree(worktreePath, wtBranch); err != nil {
 				out.Error(fmt.Sprintf("failed to create worktree: %v", err), ErrCodeInvalidOperation)
 				os.Exit(1)
 			}
 		}
 
-		worktreeRepoRoot = repoRoot
+		worktreeRepoRoot = backend.RepoDir()
 		path = worktreePath
 	}
 
