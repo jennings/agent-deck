@@ -474,7 +474,7 @@ func TestNewDialog_GetValuesWithWorktree(t *testing.T) {
 	dialog.nameInput.SetValue("test-session")
 	dialog.pathInput.SetValue("/tmp/project")
 
-	name, path, command, branch, enabled := dialog.GetValuesWithWorktree()
+	name, path, command, branch, enabled, _ := dialog.GetValuesWithWorktree()
 
 	if !enabled {
 		t.Error("worktreeEnabled should be true")
@@ -497,7 +497,7 @@ func TestNewDialog_GetValuesWithWorktree_Disabled(t *testing.T) {
 	dialog.worktreeEnabled = false
 	dialog.branchInput.SetValue("feature/test")
 
-	_, _, _, branch, enabled := dialog.GetValuesWithWorktree()
+	_, _, _, branch, enabled, _ := dialog.GetValuesWithWorktree()
 
 	if enabled {
 		t.Error("worktreeEnabled should be false")
@@ -1349,6 +1349,94 @@ func TestNewDialog_FilterPaths_EmptyInput(t *testing.T) {
 	}
 }
 
+// ===== Generated Name Fallback Tests =====
+
+func TestNewDialog_EmptyName_UsesGeneratedName(t *testing.T) {
+	d := NewNewDialog()
+	d.pathInput.SetValue("/tmp/project")
+	d.nameInput.SetValue("")
+	d.generatedName = "golden-eagle"
+
+	name, _, _ := d.GetValues()
+	if name != "golden-eagle" {
+		t.Errorf("GetValues() name = %q, want %q", name, "golden-eagle")
+	}
+}
+
+func TestNewDialog_Validate_EmptyName_UsesGeneratedName(t *testing.T) {
+	d := NewNewDialog()
+	d.pathInput.SetValue("/tmp/project")
+	d.nameInput.SetValue("")
+	d.generatedName = "swift-fox"
+
+	err := d.Validate()
+	if err != "" {
+		t.Errorf("Validate() should pass with generatedName fallback, got: %q", err)
+	}
+}
+
+func TestNewDialog_ShowInGroup_SetsGeneratedName(t *testing.T) {
+	d := NewNewDialog()
+	d.ShowInGroup("default", "default", "")
+
+	if d.generatedName == "" {
+		t.Error("generatedName should be set after ShowInGroup")
+	}
+	if d.nameInput.Placeholder != d.generatedName {
+		t.Errorf("nameInput.Placeholder = %q, want %q", d.nameInput.Placeholder, d.generatedName)
+	}
+}
+
+func TestNewDialog_WorktreeBranch_PlaceholderWhenNameEmpty(t *testing.T) {
+	d := NewNewDialog()
+	d.generatedName = "calm-river"
+	d.branchPrefix = "feature/"
+	d.nameInput.SetValue("")
+
+	d.autoBranchFromName()
+
+	// Branch input should remain empty (placeholder only)
+	if d.branchInput.Value() != "" {
+		t.Errorf("branch value should be empty when using generated name, got %q", d.branchInput.Value())
+	}
+	if d.branchInput.Placeholder != "feature/calm-river" {
+		t.Errorf("branch placeholder = %q, want %q", d.branchInput.Placeholder, "feature/calm-river")
+	}
+	if !d.branchAutoSet {
+		t.Error("branchAutoSet should be true")
+	}
+}
+
+func TestNewDialog_WorktreeBranch_FilledWhenNameProvided(t *testing.T) {
+	d := NewNewDialog()
+	d.generatedName = "calm-river"
+	d.branchPrefix = "feature/"
+	d.nameInput.SetValue("my-feature")
+
+	d.autoBranchFromName()
+
+	if d.branchInput.Value() != "feature/my-feature" {
+		t.Errorf("branch value = %q, want %q", d.branchInput.Value(), "feature/my-feature")
+	}
+}
+
+func TestNewDialog_GetValuesWithWorktree_EmptyBranch_DerivedFromName(t *testing.T) {
+	d := NewNewDialog()
+	d.worktreeEnabled = true
+	d.branchPrefix = "feature/"
+	d.generatedName = "bold-crane"
+	d.nameInput.SetValue("")
+	d.pathInput.SetValue("/tmp/project")
+	d.branchInput.SetValue("")
+
+	name, _, _, branch, _, _ := d.GetValuesWithWorktree()
+	if name != "bold-crane" {
+		t.Errorf("name = %q, want %q", name, "bold-crane")
+	}
+	if branch != "feature/bold-crane" {
+		t.Errorf("branch = %q, want %q", branch, "feature/bold-crane")
+	}
+}
 func TestNewDialog_BranchPrefix_Default(t *testing.T) {
 	d := NewNewDialog()
 	if d.branchPrefix != "feature/" {
